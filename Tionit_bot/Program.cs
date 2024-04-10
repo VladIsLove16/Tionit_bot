@@ -7,7 +7,6 @@ using System;
 using System.Linq;
 using Tionit_bot;
 using Telegram.Bot.Requests;
-
 class Program
 {
     // Это клиент для работы с Telegram Bot API, который позволяет отправлять сообщения, управлять ботом, подписываться на обновления и многое другое.
