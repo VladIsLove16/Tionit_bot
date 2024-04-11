@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Tionit_bot
 {
-    internal class Info
+    public class Info
     {
         public string Username=" ";
-        public int TheshId=0;
-        public int ChatId=0;
+        public int ThreadID=0;
+        public int ChatID=0;
         public Info() { }
     }
 }

@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Repository %282%29.zip" />
+    <None Remove="Repository.zip" />
+    <None Remove="Комментарий.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Telegram.Bot" Version="19.0.0" />
   </ItemGroup>
 

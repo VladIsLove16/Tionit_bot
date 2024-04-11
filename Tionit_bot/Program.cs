@@ -7,19 +7,16 @@ using System;
 using System.Linq;
 using Tionit_bot;
 using Telegram.Bot.Requests;
+using System.Threading;
 class Program
 {
-    // Это клиент для работы с Telegram Bot API, который позволяет отправлять сообщения, управлять ботом, подписываться на обновления и многое другое.
     private static ITelegramBotClient _botClient;
-
     // Это объект с настройками работы бота. Здесь мы будем указывать, какие типы Update мы будем получать, Timeout бота и так далее.
     private static ReceiverOptions _receiverOptions;
     private static List<Info> Chats = new();
-    private static Repository Repository=new();
-    private static ChatId OperatorsGroup = -1002087832593;
+    private static ChatId OperatorsGroupID = -1002087832593;
     static async Task Main()
     {
-
         _botClient = new TelegramBotClient("6606038493:AAFM4KJE2yfJ2jR-l0WXLWbw5_Oab6FLeL8"); // Присваиваем нашей переменной значение, в параметре передаем Token, полученный от BotFather
         _receiverOptions = new ReceiverOptions // Также присваем значение настройкам бота
         {
@@ -37,16 +34,13 @@ class Program
         // UpdateHander - обработчик приходящих Update`ов
         // ErrorHandler - обработчик ошибок, связанных с Bot API
         _botClient.StartReceiving(UpdateHandler, ErrorHandler, _receiverOptions, cts.Token); // Запускаем бота
-
         var me = await _botClient.GetMeAsync(); // Создаем переменную, в которую помещаем информацию о нашем боте.
         
+        //получаем некую базу данных
        // Chats = Repository.GetChats();
-        Console.WriteLine("Список чатов получен");
         Console.WriteLine($"{me.FirstName} запущен!");
 
         await Task.Delay(-1); // Устанавливаем бесконечную задержку, чтобы наш бот работал постоянно
-
-        // repostitory
     }
     private static async Task UpdateHandler(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
@@ -58,62 +52,56 @@ class Program
             {
                 case UpdateType.Message:
                     {
-                        var message = update.Message;
+                        Message? message = update.Message;
+                        if (message == null) throw new ArgumentException("Message is null");
 
                         User? user = message.From;
+                        if(user==null) throw new ArgumentNullException("User is null");
                         // Chat - содержит всю информацию о чате
                         Chat chat = message.Chat;
-                        if (chat.Id==OperatorsGroup)
-                        //cообщение от оператора
+                        if (chat.Id==OperatorsGroupID)
+                            //сообщение сообщение от Оператора
                         {
+                            ChatId? userChatId = FindInfodByThread(message.MessageThreadId).ChatID;
                             await botClient.SendTextMessageAsync(
-                                FindPairInListByThresh((int)message.MessageThreadId).ChatId,
-                                message.Text
+                                userChatId,
+                                message.Text??"Message text was Null"
                                 );
-
                         }
-                        else
-                        //cообщение от пользователя
+                        else 
+                        //сообщение от Пользователя
                         {
-                            bool contains = false;
-                            foreach(Info pair in Chats)
+                            if (user.Username == null) { Console.WriteLine("Пользователь без имени пользователя написал сообщение"); return; }
+                            Info? UserInfo = FindInfoByUsername(user.Username);
+                            if (UserInfo==null)
+                            //создаем топик для нового пользователя
                             {
-                                if (pair.Username == user.Username)
-                                {
-                                    contains = true;
-                                    break;
-                                }
-                            }
-                            if (!contains)
-                            {
-                                Task<ForumTopic> topic= botClient.CreateForumTopicAsync(OperatorsGroup, user.Username);
+                                Task<ForumTopic> topic= botClient.CreateForumTopicAsync(OperatorsGroupID, user.Username);
                                 ForumTopic forumTopic = topic.Result;
-                                Info info = new Info()
+                                //а так можно делать??
+                                UserInfo = new Info()
                                 {
                                     Username = user.Username,
-                                    TheshId = forumTopic.MessageThreadId,
-                                    ChatId = (int)chat.Id
+                                    ThreadID = forumTopic.MessageThreadId,
+                                    ChatID = (int)chat.Id
                                 };
-                                Chats.Add(info);
-                                Console.WriteLine("chatid: "+info.ChatId + "   " + info.TheshId + "   " +info.Username);
-                                //Repository.Save(Chats);
+                                Chats.Add(UserInfo);
+                                Console.WriteLine("Topic Created: chatid: "+ UserInfo.ChatID + "   " + UserInfo.ThreadID + "   " + UserInfo.Username);
+                                //Repository.SaveChats(Chats);
                             }
                             //сообщение пользователю
                             await botClient.SendTextMessageAsync(
                                 chat.Id,
-                                "Запрос получен, ожидаем ответа оператора" // отправляем то, что написал пользователь
-                                );  
-
-                            Info Pair = FindPairInList(user.Username);
-                            //сообщение в группу Операторов
+                                "Запрос получен, ожидаем ответа оператора" 
+                                );
+                            //сообщение Оператору
                             await botClient.ForwardMessageAsync(
-                                 OperatorsGroup,
+                                 OperatorsGroupID,
                                  chat.Id,
                                  message.MessageId,
-                                 Pair.TheshId
+                                 UserInfo.ThreadID
                                  );
                         }
-                       
                         return;
                     }
             }
@@ -123,7 +111,7 @@ class Program
             Console.WriteLine(ex.ToString());
         }
     }
-    private static Info FindPairInList(string username)
+    private static Info? FindInfoByUsername(string username)
     {
         foreach (Info pair in Chats)
         {
@@ -132,19 +120,20 @@ class Program
                 return pair;
             }
         }
-        return new Info(); ;
+        return null;
 
     }
-    private static Info FindPairInListByThresh(int Theshid)
+    private static Info? FindInfodByThread(int? threadId)
     {
-        foreach (Info pair in Chats)
+        if( !threadId.HasValue )return null;
+        foreach (Info chat in Chats)
         {
-            if (pair.TheshId == Theshid)
+            if (chat.ThreadID == threadId)
             {
-                return pair;
+                return chat;
             }
         }
-        return new Info(); ;
+        return null;
 
     }
 
